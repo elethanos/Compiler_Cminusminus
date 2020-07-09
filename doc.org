@@ -1,4 +1,4 @@
-* Le projet
+-* Le projet
 ** La page du projet
 [[www.lsv.ens-cachan.fr/~goubault/CoursProgrammation/MiniC1/minicindex.html]]
 
@@ -24,7 +24,7 @@ source : http://www.lsv.ens-cachan.fr/~goubault/CoursProgrammation/MiniC1/minic0
 ** L'arbre syntaxique
 On peut regarder pour plus de détails le fichier de parsing =ctab.mly= / =clex.mll=.
 
-Le type de sortie est Cparse.var_declaration (cf =cparse.ml= pour la liste)
+Le type de sortie est Cparse.var_declaration (cf =cparse.mli= pour la liste)
 
 Le type locator est juste un pointeur sur des informations permettant aux fonctions Error.error et Error.warning d’afficher des message d’erreur sensés.
 

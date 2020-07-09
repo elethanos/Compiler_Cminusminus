@@ -1,7 +1,7 @@
 type mon_op = M_MINUS | M_NOT | M_POST_INC | M_POST_DEC | M_PRE_INC | M_PRE_DEC
 (** Les opérations unaires:
   M_MINUS: calcule l'opposé -e de e;
-  M_NOT: calcule la négation logique ~e de e;
+  M_NOT: calcule la négation logique ~e de e (c'est !a);
   M_POST_INC: post-incrémentation e++;
   M_POST_DEC: post-décrémentation e--;
   M_PRE_INC: pré-incrémentation ++e;
@@ -62,7 +62,7 @@ and code =
   | CEXPR of loc_expr (** une expression e; vue comme instruction. *)
   | CIF of loc_expr * loc_code * loc_code (** if (e) c1; else c2; *)
   | CWHILE of loc_expr * loc_code (** while (e) c1; *)
-  | CRETURN of loc_expr option (** return; ou return (e); *)
+  | CRETURN of loc_expr option (** return; ou return (e); None; Some e*)
 
 val cline : int ref
 val ccol : int ref

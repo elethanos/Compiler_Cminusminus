@@ -51,10 +51,10 @@ let () =
          Unix.open_process_in ("cpp -DMCC \"" ^ (String.escaped s) ^ "\""))
     "compiles a C-- program"
 
-let () =
+let ()= 
   let lexbuf = Lexing.from_channel (!input) in
   let c = Ctab.translation_unit Clex.ctoken lexbuf in
-  let out = if !c_E then stdout else open_out (!c_prefix ^ ".s") in
+  let out = if !c_E then stdout else open_out (!c_prefix ^ ".asm") in
     Error.flush_error ();
 
     if !c_D then begin
@@ -75,8 +75,8 @@ let () =
       let command =
         let prefix = String.escaped !c_prefix in
           Printf.sprintf
-            "gcc -no-pie -ggdb -o \"%s\" \"%s.s\" -lc -lm"
-            prefix prefix
+            "nasm -f elf64 -o \"%s.o\" \"%s.asm\" && gcc -no-pie -ggdb -o \"%s.out\" \"%s.o\" -lc -lm"
+            prefix prefix prefix prefix
       in
         ignore (Unix.system command)
     end
