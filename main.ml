@@ -75,7 +75,7 @@ let ()=
       let command =
         let prefix = String.escaped !c_prefix in
           Printf.sprintf
-            "nasm -f elf64 -o \"%s.o\" \"%s.asm\" && gcc -no-pie -ggdb -o \"%s.out\" \"%s.o\" -lc -lm"
+            "nasm -f elf64 -g -o \"%s.o\" \"%s.asm\" && gcc -no-pie -g -o \"%s.out\" \"%s.o\" -lc -lm"
             prefix prefix prefix prefix
       in
         ignore (Unix.system command)
