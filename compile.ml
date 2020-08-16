@@ -2,6 +2,51 @@ open Cparse
 open Genlab
 open Verbose
 
+(** Helper function to escape strings, useful when we want to put in the .asm
+an actual \n coming from a printf("Hello\n") for example. **)
+(* This function is usefull to be able to put accent.
+   I cannot use String.escaped because it escape in
+   decimal while I need here octal.
+*)
+let octal_escaped s =
+  let count = ref 0 in
+  let len = String.length s in
+  for i = 0 to len - 1 do
+    match s.[i] with
+    | '\n' | '"' | '\\' ->
+      count := !count + 1
+    | c when c < ' ' || c > '\x7F' ->
+      count := !count + 3
+    | _ -> ()
+  done;
+  if !count = 0 then s
+  else
+    let s' = Bytes.create (len + !count) in
+    let j = ref 0 in
+    for i = 0 to len - 1 do
+      match s.[i] with
+      | '"' | '\\' as c ->
+        Bytes.set s' (!j + 0) '\\';
+        Bytes.set s' (!j + 1) c;
+        j := !j + 2
+      | '\n' ->
+        Bytes.set s' (!j + 0) '\\';
+        Bytes.set s' (!j + 1) 'n';
+        j := !j + 2
+      | c when c < ' ' || c > '\x7F' ->
+        let c = Char.code c in
+        Bytes.set s' (!j + 0) '\\';
+        Bytes.set s' (!j + 1) Char.(unsafe_chr (code '0' + (c / 64) land 0x7));
+        Bytes.set s' (!j + 2) Char.(unsafe_chr (code '0' + ( c / 8) land 0x7));
+        Bytes.set s' (!j + 3) Char.(unsafe_chr (code '0' + (     c) land 0x7));
+        j := !j + 4
+      | c ->
+        Bytes.set s' !j c;
+        incr j
+    done;
+    Bytes.to_string s'
+
+
 (* Associe un nom de variable à une addresse *)
 module Str_map = Map.Make(String)
 type label = string
@@ -24,7 +69,7 @@ let write_address (my_address:address) : code_asm =
   | Local_bp num -> (Printf.sprintf "[rbp-%d]" (num*8))
   | String label -> (Printf.sprintf "[%s]" label)
   | Register reg -> (Printf.sprintf "%s" reg)
-  | Stdlib label -> ()
+  | Stdlib label -> (raise (Compilation_error "Stdlib should not be defined."))
 
 let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : address * code_asm * int =
   match loc_expr with
@@ -32,11 +77,14 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
   | (_, CST valeur) -> (Local_bp delta, Printf.sprintf "push %d\n" valeur, delta+1)
   | (_, STRING str) -> (let name = genlab name_fun in
                         (* Attention aux chaines qui contiennent des ' *)
-                        (String name,Printf.sprintf "section .data\n%s: db '%s',0"  name str, delta))
+                        (String name,Printf.sprintf "section .data\n%s: db '%s',0 \n"
+                                       name
+                                       (octal_escaped str),
+                         delta))
   | (_,SET_VAR (name_var, loc_expr)) -> 
     let (addr2, code2, delta2) = compile_expr rho name_fun delta loc_expr in
     (Str_map.find name_var rho,
-     Printf.sprintf "%s\n mov %s, %s\n"
+     Printf.sprintf "%s\n mov %s, %s \n"
         code2
         (write_address (Str_map.find name_var rho))
         (write_address addr2),
@@ -46,10 +94,10 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     let (addr, code, delta1) = compile_expr rho name_fun delta case in
     (let (addr2, code2, delta2) = compile_expr rho name_fun delta1 valeur in
      (Local_bp (delta2 + 1),
-      Printf.sprintf "%s \n%s \nlea rbx, %s \nadd rbx, %s  \nmov [rbx], %s \npush [rbx]"
+      Printf.sprintf "%s \n%s \nlea rbx, %s \nadd rbx, %s  \nmov [rbx], %s \npush [rbx] \n"
         code
         code2
-        (write_address (Str_map name_array rho))
+        (write_address (Str_map.find name_array rho))
         (write_address addr)
         (write_address addr2),
       delta2 + 1
@@ -58,40 +106,38 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
   )
   | (_, CALL (name_fun, argu_list)) -> (
     
-    let (addr1, code1, delta1, case) = List.fold_left
-                                         (fun (addrr, codee, deltaa, case1) expr ->
-                                           let (addr2, code2, delta2) = compile_expr rho name_fun deltaa expr in
-                                           addr2,
-                                           (codee^code2^(Printf.sprintf "mov %s, %s"
-                                                           if case1 = 0 then "rsi"
-                                                           else if case1 = 1 then "rdx"
-                                                           else if case1 = 2 then "rcx"
-                                                           else if case1 = 3 then "r8"
-                                                           else if case1 = 4 then "r9"
-                                                           else raise Compilation_error "You have too many arguments"
-                                                                  (write_address addr2)
-                                                        )
-                                           ),
-                                           delta2,
-                                           case1 + 1
+    let (code1, delta1, case) = List.fold_left
+                                         (fun (codee, deltaa, case1) expr ->
+                                           let (addr2, code2, delta2) = compile_expr rho name_fun deltaa expr in                                          
+                                           (codee^code2^(Printf.sprintf "mov %s, %s \n"
+                                                           (if case1 = 0 then "rsi"
+                                                            else if case1 = 1 then "rdx"
+                                                            else if case1 = 2 then "rcx"
+                                                            else if case1 = 3 then "r8"
+                                                            else if case1 = 4 then "r9"
+                                                            else raise (Compilation_error "You have too many arguments"))
+                                                           (write_address addr2)
+                                                        ),
+                                            delta2,
+                                            case1 + 1)
                                          )
-                                   (_, "", delta, 0)
+                                   ("", delta, 0)
                                    argu_list in
-    _,
-    Printf.sprintf "push rbp \nadd rsp, 1 \nmov rbp, rsp \n%s \ncall %s \n" code1 name_fun,
-    delta1
+    (Local_bp (delta1 + 1),
+    Printf.sprintf "%s \npush rsp \npush qword [rsp+0] \nand rsp, 0x10 \nextern %s \ncall %s \nmov rsp, qword [rsp + 8] \npush rax \n" code1 name_fun name_fun,
+    delta1 + 1)
   )
   | (_, OP1 (oper, loc_expr)) -> (
     let (addr, code, delta1) = compile_expr rho name_fun delta loc_expr in
      (match oper with
       | M_MINUS -> (Local_bp (delta1 + 1),
-                    Printf.sprintf "%s \nmov rax,%s \nneg rax \npush rax" code (write_address addr),
+                    Printf.sprintf "%s \nmov rax,%s \nneg rax \npush rax \n" code (write_address addr),
                     delta1 + 1)
       | M_NOT -> (Local_bp (delta1 + 1),
                   Printf.sprintf "%s \nmov rax, %s \nnot rax \npush rax \n" code (write_address addr),
                   delta1 + 1)
       | M_POST_INC -> (Local_bp (delta1 + 1),
-                       Printf.sprintf "%s \nmov rax, %s \nadd %s, 1 \npush rax \n" code (write_address addr) (write_address adrr),
+                       Printf.sprintf "%s \nmov rax, %s \nadd %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
                        delta1 + 1)
       | M_POST_DEC -> (Local_bp (delta + 1),
                        Printf.sprintf "%s \nmov rax, %s \nsub %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
@@ -115,7 +161,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
                  Printf.sprintf "%s \n%s \nmov rax, %s \ndiv %s \npush rax \n" code code2 (write_address addr) (write_address addr2),
                  delta2)
      | S_MOD -> (Local_bp (delta + 1),
-                 Printf.sprintf "%s \n%s \nmov rax, %s \ndiv %s \npush rdx" code code2 addr addr2,
+                 Printf.sprintf "%s \n%s \nmov rax, %s \ndiv %s \npush rdx \n" code code2 (write_address addr) (write_address addr2),
                  delta2 + 1)
      | S_ADD -> (Local_bp (delta2 + 1),
                  Printf.sprintf "%s \n%s \nmov rax, %s \nadd rax, %s \npush rax \n" code code2 (write_address addr) (write_address addr2),
@@ -135,7 +181,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     let name2 = genlab name_fun in
     (Local_bp (delta1 + 1),
      Printf.sprintf "%s \n%s \ncmp %s, %s \n%s %s \npush 0 \njmp %s \n%s: push 1 \n%s: nop \n"
-       code
+       code1
        code2
        (write_address addr1)
        (write_address addr2)
@@ -156,7 +202,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     let name_true = genlab name_fun in
     let name_false = genlab name_fun in
     (
-      _, 
+      Local_bp (delta2), 
       Printf.sprintf "%s \ncmp 1, %s \nje %s \n%s \njmp %s \n%s: %s \n%s: nop"
         code3
         (write_address addr3)
@@ -166,22 +212,30 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
         name_true
         code2
         name_false,
-      delta2 + 1
+      delta2
     )
   )
-  | (_, ESEQ loc_expr_list) -> (
+  | (loc, ESEQ loc_expr_list) -> (
+    match loc_expr_list with
+    | [] -> raise (Compilation_error "This sequence is empty. \n")
+    | x::[] -> compile_expr rho name_fun delta x
+    | x::r -> let (addr1, code1, delta1) = compile_expr rho name_fun delta x in
+              let (addr2, code2, delta2) = compile_expr rho name_fun delta1 (loc, ESEQ r) in
+              (addr2,
+               code1^code2,
+              delta2)
   )
 
            
 let rec local_decl (rho : env) var_decl (delta : int) : (code_asm * env * int ) =
   match var_decl with
-  | CDECL (_, name_var) -> (
+  | CDECL (_, (name_var : string)) -> (
     Printf.sprintf "push 0 \n",
-    Str_map.add name_var (Local (delta + 1)),
+    Str_map.add name_var (Local_bp (delta + 1)) rho,
     delta + 1
   )
   | CFUN (_, name_fun, argu_list, loc_code) -> (
-    raise Compilation_error "A function can not be declared in this context."
+    raise (Compilation_error "A function can not be declared in this context.")
   )
 
 let gerer_list_decl (chaine1, rho, delta) var_decl : ( code_asm * env * int )=
@@ -207,7 +261,7 @@ let rec compile_code (rho : env) name_fun (delta : int) loc_code : (code_asm * i
     )
   )
   | (_, CEXPR loc_expr) -> (
-    let (addr1, code1, delta1)  = compile_expr name_fun delta loc_expr in
+    let (addr1, code1, delta1)  = compile_expr rho name_fun delta loc_expr in
     (Printf.sprintf "%s" code1,
     delta1)
   )
@@ -243,6 +297,16 @@ let rec compile_code (rho : env) name_fun (delta : int) loc_code : (code_asm * i
         end_lab,
       delta2)
   )
+  | (_, CRETURN loc_expr_option) -> (
+    match loc_expr_option with
+    | None -> (Printf.sprintf "xor rax, rax \nleave \nret \n",
+               delta)
+    | Some loc_expr -> (let (addr1, code1, delta1) = compile_expr rho name_fun delta loc_expr in
+                        (Printf.sprintf "%s \nmov rax, %s \nleave \nret \n" code1 (write_address addr1),
+                        delta1)
+                        
+    )
+  )
 
 let rec global_decl (rho : env) var_decl : (code_asm * env ) = 
   match var_decl with
@@ -252,18 +316,41 @@ let rec global_decl (rho : env) var_decl : (code_asm * env ) =
     Str_map.add name_var (Global name_lab) rho)
   )
   | CFUN (_, name_fun, argu_list, loc_code) -> (
-    let name_lab = genlab name_fun in
-    let (code1, rho1)  = List.fold_left
-                 (fun (rhoo, codee) argu_decl ->
-                   let (code2, rho2) = global_decl rhoo argu_decl in
-                   (codee^code2,
-                    rho2 
-                   )
-                     ("", rho)
-                     argu_list
-                 ) in
+    let (code1, rho1, delta, case)  = List.fold_left
+                                        (fun (codee, rhoo, deltaa, case1) argu_decl ->
+                                          let (code2, rho2, delta1) = local_decl rhoo argu_decl deltaa in
+                                          (codee^code2^Printf.sprintf "mov %s, %s \n"
+                                                         (if case1 = 0 then "rsi"
+                                                          else if case1 = 1 then "rdx"
+                                                          else if case1 = 2 then "rcx"
+                                                          else if case1 = 3 then "r8"
+                                                          else if case1 = 4 then "r9"
+                                                          else raise (Compilation_error "You have too many arguments"))
+                                                         (write_address (Local_bp delta1)),
+                                           rho2,
+                                           delta1,
+                                           case1 + 1)
+                                        )
+                                        ("", rho, 0, 0)
+                                        argu_list
+    in
     let (code, delta) = compile_code rho name_fun 0 loc_code in
-    (Printf.sprintf "%s: nop \n%s \n%s" name_lab code1 code, (* gerer la declaration des arguments*)
+    (Printf.sprintf "%s: nop \npush rbp \nmov rbp,rsp \n%s \n%s \n" name_fun code1 code, 
      rho1
     )
   )
+
+(* f "": nombre , je voudrais avoir nombre *)
+
+let rec compile out decl_list =
+  let (code2, rho2) = List.fold_left
+                        (fun (code_asm, rho) var_decl ->
+                          let (code1, rho1) =  global_decl rho var_decl in
+                          (code_asm^code1,
+                           rho1
+                          )
+                        )
+                        ("", Str_map.empty)
+                        decl_list in
+  Printf.fprintf out "global  main\nsection   .text\n%s" code2
+  
