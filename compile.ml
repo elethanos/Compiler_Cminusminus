@@ -67,7 +67,7 @@ let write_address (my_address:address) : code_asm =
   match my_address with
   | Global label -> (Printf.sprintf "[%s]" label)
   | Local_bp num -> (Printf.sprintf "[rbp-%d]" (num*8))
-  | String label -> (Printf.sprintf "[%s]" label)
+  | String label -> (Printf.sprintf "%s" label)
   | Register reg -> (Printf.sprintf "%s" reg)
   | Stdlib label -> (raise (Compilation_error "Stdlib should not be defined."))
 
@@ -77,7 +77,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
   | (_, CST valeur) -> (Local_bp delta, Printf.sprintf "push %d\n" valeur, delta+1)
   | (_, STRING str) -> (let name = genlab name_fun in
                         (* Attention aux chaines qui contiennent des ' *)
-                        (String name,Printf.sprintf "section .data\n%s: db '%s',0 \n"
+                        (String name,Printf.sprintf "section .data\n%s: db `%s`,0 \nsection .text\n"
                                        name
                                        (octal_escaped str),
                          delta))
@@ -107,24 +107,24 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
   | (_, CALL (name_fun, argu_list)) -> (
     
     let (code1, delta1, case) = List.fold_left
-                                         (fun (codee, deltaa, case1) expr ->
-                                           let (addr2, code2, delta2) = compile_expr rho name_fun deltaa expr in                                          
-                                           (codee^code2^(Printf.sprintf "mov %s, %s \n"
-                                                           (if case1 = 0 then "rsi"
-                                                            else if case1 = 1 then "rdx"
-                                                            else if case1 = 2 then "rcx"
-                                                            else if case1 = 3 then "r8"
-                                                            else if case1 = 4 then "r9"
-                                                            else raise (Compilation_error "You have too many arguments"))
-                                                           (write_address addr2)
-                                                        ),
+                                  (fun (codee, deltaa, case1) expr ->
+                                    let (addr2, code2, delta2) = compile_expr rho name_fun deltaa expr in                                          
+                                    (codee^code2^(Printf.sprintf "mov %s, %s \n"
+                                                    (if case1 = 0 then "rdi"
+                                                     else if case1 = 1 then "rsi"
+                                                     else if case1 = 2 then "rdx"
+                                                     else if case1 = 3 then "rcx"
+                                                     else if case1 = 4 then "r8"
+                                                     else if case1 = 5 then "r9"
+                                                     else raise (Compilation_error "You have too many arguments"))
+                                                    (write_address addr2)),
                                             delta2,
                                             case1 + 1)
                                          )
                                    ("", delta, 0)
                                    argu_list in
     (Local_bp (delta1 + 1),
-    Printf.sprintf "%s \npush rsp \npush qword [rsp+0] \nand rsp, 0x10 \nextern %s \ncall %s \nmov rsp, qword [rsp + 8] \npush rax \n" code1 name_fun name_fun,
+    Printf.sprintf "%s \npush rsp \npush qword [rsp+0] \nand rsp, -0x10 \nextern %s \ncall %s \nmov rsp, qword [rsp + 8] \npush rax \n" code1 name_fun name_fun,
     delta1 + 1)
   )
   | (_, OP1 (oper, loc_expr)) -> (
@@ -319,14 +319,15 @@ let rec global_decl (rho : env) var_decl : (code_asm * env ) =
     let (code1, rho1, delta, case)  = List.fold_left
                                         (fun (codee, rhoo, deltaa, case1) argu_decl ->
                                           let (code2, rho2, delta1) = local_decl rhoo argu_decl deltaa in
-                                          (codee^code2^Printf.sprintf "mov %s, %s \n"
-                                                         (if case1 = 0 then "rsi"
-                                                          else if case1 = 1 then "rdx"
-                                                          else if case1 = 2 then "rcx"
-                                                          else if case1 = 3 then "r8"
-                                                          else if case1 = 4 then "r9"
-                                                          else raise (Compilation_error "You have too many arguments"))
-                                                         (write_address (Local_bp delta1)),
+                                          (codee^code2^Printf.sprintf "mov %s, %s \n"                                           
+                                                         (write_address (Local_bp delta1))
+                                                         (if case1 = 0 then "rdi"
+                                                          else if case1 = 1 then "rsi"
+                                                          else if case1 = 2 then "rdx"
+                                                          else if case1 = 3 then "rcx"
+                                                          else if case1 = 4 then "r8"
+                                                          else if case1 = 5 then "r9"
+                                                          else raise (Compilation_error "You have too many arguments")),
                                            rho2,
                                            delta1,
                                            case1 + 1)
