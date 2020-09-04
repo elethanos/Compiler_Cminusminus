@@ -332,10 +332,10 @@ let rec global_decl (rho : env) var_decl : (code_asm * env ) =
                                            delta1,
                                            case1 + 1)
                                         )
-                                        ("", rho, 0, 0)
+                                        ("", rho, 1, 0)
                                         argu_list
     in
-    let (code, delta) = compile_code rho name_fun 0 loc_code in
+    let (code, delta) = compile_code rho name_fun delta loc_code in
     (Printf.sprintf "%s: nop \npush rbp \nmov rbp,rsp \n%s \n%s \n" name_fun code1 code, 
      rho1
     )
