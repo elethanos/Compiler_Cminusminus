@@ -74,7 +74,7 @@ let write_address (my_address:address) : code_asm =
 let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : address * code_asm * int =
   match loc_expr with
   | (_, VAR name_var) -> (Str_map.find name_var rho, "", delta)
-  | (_, CST valeur) -> (Local_bp delta, Printf.sprintf "push %d\n" valeur, delta+1)
+  | (_, CST valeur) -> (Local_bp (delta + 1), Printf.sprintf "push %d\n" valeur, delta+1)
   | (_, STRING str) -> (let name = genlab name_fun in
                         (* Attention aux chaines qui contiennent des ' *)
                         (String name,Printf.sprintf "section .data\n%s: db `%s`,0 \nsection .text\n"
@@ -84,10 +84,10 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
   | (_,SET_VAR (name_var, loc_expr)) -> 
     let (addr2, code2, delta2) = compile_expr rho name_fun delta loc_expr in
     (Str_map.find name_var rho,
-     Printf.sprintf "%s\n mov %s, %s \n"
+     Printf.sprintf "; 123456 \n%s\n ;set var\n mov rbx, %s \n mov %s, rbx\n"
         code2
-        (write_address (Str_map.find name_var rho))
-        (write_address addr2),
+        (write_address addr2)
+        (write_address (Str_map.find name_var rho)),
      delta2
     )
   | (_, SET_ARRAY (name_array, case, valeur)) -> (
@@ -155,7 +155,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     (let (addr2, code2, delta2) = compile_expr rho name_fun delta1 loc_expr2 in
      match oper with
      | S_MUL -> (Local_bp (delta2 + 1),
-                 Printf.sprintf "%s \n%s \nmov rax, %s \nmul %s \npush rax \n" code code2 (write_address addr) (write_address addr2), 
+                 Printf.sprintf "%s \n%s \nmov rax, %s \nmul qword %s \npush rax \n" code code2 (write_address addr) (write_address addr2), 
                  delta2 + 1)
      | S_DIV -> (Local_bp (delta2 + 1),
                  Printf.sprintf "%s \n%s \nmov rax, %s \ndiv %s \npush rax \n" code code2 (write_address addr) (write_address addr2),
@@ -332,7 +332,7 @@ let rec global_decl (rho : env) var_decl : (code_asm * env ) =
                                            delta1,
                                            case1 + 1)
                                         )
-                                        ("", rho, 1, 0)
+                                        ("", rho, 0, 0)
                                         argu_list
     in
     let (code, delta) = compile_code rho name_fun delta loc_code in
