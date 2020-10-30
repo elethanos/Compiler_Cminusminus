@@ -180,13 +180,13 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     let name = genlab name_fun in
     let name2 = genlab name_fun in
     (Local_bp (delta1 + 1),
-     Printf.sprintf "%s \n%s \ncmp %s, %s \n%s %s \npush 0 \njmp %s \n%s: push 1 \n%s: nop \n"
+     Printf.sprintf "%s \n%s \n;; CMP \nmov rax, %s \ncmp %s, rax \n%s %s \npush 0 \njmp %s \n%s: push 1 \n%s: nop \n"
        code1
        code2
-       (write_address addr1)
        (write_address addr2)
+       (write_address addr1)
        (match cmp_op with
-        | C_LT -> Printf.sprintf "jlt"
+        | C_LT -> Printf.sprintf "jl"
         | C_EQ -> Printf.sprintf "je"
         | C_LE -> Printf.sprintf "jle")
        name
@@ -203,7 +203,7 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
     let name_false = genlab name_fun in
     (
       Local_bp (delta2), 
-      Printf.sprintf "%s \ncmp 1, %s \nje %s \n%s \njmp %s \n%s: %s \n%s: nop"
+      Printf.sprintf "%s \n;; EIF \nmov rax, 0\ncmp rax, %s \njne %s \n%s \njmp %s \n%s: %s \n%s: nop"
         code3
         (write_address addr3)
         name_true
@@ -271,7 +271,7 @@ let rec compile_code (rho : env) name_fun (delta : int) loc_code : (code_asm * i
     let (code3, delta3) = compile_code rho name_fun delta2 code_else in
     let name_if = genlab name_fun in
     let name_else = genlab name_fun in
-    (Printf.sprintf "%scmp 0, %s \nje %s \n%sjmp %s \n%s: %s \n%s: nop \n"
+    (Printf.sprintf "%s\n;; CIF\nmov rax, 0\ncmp rax, %s \nje %s \n%sjmp %s \n%s: %s \n%s: nop \n"
       code1
       (write_address addr1)
       name_else
