@@ -2,7 +2,7 @@
 This project is a compiler of a simplified version of C, it compiles to Assembly (64 bits).
 It is inspired by the course proposed in the school ENS Paris-Saclay: http://www.lsv.fr/~goubault/CoursProgrammation/MiniC1/minic.html.
 
-I implemented the translation of the AST (Abstract Syntax Tree) of C-- to an assembly code. The main part of this project is written in ocaml.
+I implemented the translation of the AST (Abstract Syntax Tree) of C---- to an assembly code. The main part of this project is written in ocaml.
 ** Compile the project
 To download and compile the project, make sure you have ocaml installed :
 : sudo apt-get install ocaml
