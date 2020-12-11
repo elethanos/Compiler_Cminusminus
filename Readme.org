@@ -1,6 +1,8 @@
 * My C- - Compiler
-This project is for a school project. The goal is to design a C- - compiler (you can find the semantic of C- - here (french, sorry about that) : [[http://www.lsv.ens-cachan.fr/~goubault/CoursProgrammation/prog1_sem1.pdf]])
+This project is a compiler of a simplified version of C, it compiles to Assembly (64 bits).
+It is inspired by the course proposed in the school ENS Paris-Saclay: http://www.lsv.fr/~goubault/CoursProgrammation/MiniC1/minic.html.
 
+I implemented the translation of the AST (Abstract Syntax Tree) of C-- to an assembly code. The main part of this project is written in ocaml.
 ** Compile the project
 To download and compile the project, make sure you have ocaml installed :
 : sudo apt-get install ocaml
