@@ -14,9 +14,9 @@ Then just do :
 
 ** Compile your own C- - file
 The mcc file given is the compiler. To run an example you can do for example
-: cd Exemples/My_example
-: ../../mcc try_to_kill_me.c
-: ./try_to_kill_me
+: cd Exemples/
+: ../mcc conditions.c
+: ./conditions.out
 
 Please note that the integers are in 64 bits, so instead of using =%d= (in scanf or printf), prefer using =%llu= (if you don't, it works often, but can lead to some strange bug, especially with negative and big numbers).
 
