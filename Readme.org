@@ -6,8 +6,8 @@ To download and compile the project, make sure you have ocaml installed :
 : sudo apt-get install ocaml
 
 Then just do :
-: git clone https://github.com/tobiasBora/compiler_project
-: cd compiler_project
+: git clone https://github.com/ethanlarrar/Compiler_Cminusminus.git
+: cd Compiler_Cminusminus
 : make
 
 ** Compile your own C- - file
