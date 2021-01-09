@@ -137,16 +137,16 @@ let rec compile_expr (rho : env) (name_fun:string) (delta : int) loc_expr : addr
                   Printf.sprintf "%s \nmov rax, %s \nnot rax \npush rax \n" code (write_address addr),
                   delta1 + 1)
       | M_POST_INC -> (Local_bp (delta1 + 1),
-                       Printf.sprintf "%s \nmov rax, %s \nadd %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
+                       Printf.sprintf "%s \nmov rax, %s \nadd qword %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
                        delta1 + 1)
       | M_POST_DEC -> (Local_bp (delta + 1),
-                       Printf.sprintf "%s \nmov rax, %s \nsub %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
+                       Printf.sprintf "%s \nmov rax, %s \nsub qword %s, 1 \npush rax \n" code (write_address addr) (write_address addr),
                        delta1 + 1)
       | M_PRE_INC -> (addr,
-                      Printf.sprintf "%s \nadd %s, 1 \n" code (write_address addr),
+                      Printf.sprintf "%s \nadd qword %s, 1 \n" code (write_address addr),
                       delta)
       | M_PRE_DEC -> (addr,
-                      Printf.sprintf "%s \nsub %s, 1 \n" code (write_address addr),
+                      Printf.sprintf "%s \nsub qword %s, 1 \n" code (write_address addr),
                       delta)
      )
   )
@@ -287,7 +287,7 @@ let rec compile_code (rho : env) name_fun (delta : int) loc_code : (code_asm * i
      let (code2, delta2) = compile_code rho name_fun delta1 code in
      let condition_lab = genlab name_fun in
      let end_lab = genlab name_fun in
-     (Printf.sprintf "%s%s: cmp 0, %s \nje %s \n%sjmp %s \n%s: nop \n"
+     (Printf.sprintf "%s%s: cmp qword %s, 0 \nje %s \n%sjmp %s \n%s: nop \n"
         code1
         condition_lab
         (write_address addr1)
