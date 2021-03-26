@@ -249,15 +249,20 @@ let gerer_list_decl (chaine1, rho, delta) var_decl : ( code_asm * env * int )=
 let rec compile_code (rho : env) name_fun (delta : int) loc_code : (code_asm * int) = 
   match loc_code with
   | (_, CBLOCK (local_decl_list, loc_code_list)) -> (
-    let (code1, rho1, delta1) = List.fold_left gerer_list_decl ("", rho, delta) local_decl_list in
+    (* to make sure we don't push multiple times in loop we reset the rsp at the end of the block
+       r12 will be used to save the old value of rsp and we also save old value of r12 on the stack 
+     *)
+    let code0 = "push r12 \nmov r12, rsp\n" in
+    let (code1, rho1, delta1) = List.fold_left gerer_list_decl (code0, rho, delta + 1) local_decl_list in
     let (code2, delta2) = List.fold_left
                             (fun (code_ass, deltaa) loca_code ->
                               let (code_, deltaa1) = compile_code rho1 name_fun deltaa loca_code in
                               (code_ass^code_, deltaa1))
                             (code1, delta1)
                             loc_code_list in
-    (code2,
-     delta2 
+    let code3 = "mov rsp, r12 \npop r12\n" in
+    (code2^code3,
+     0 
     )
   )
   | (_, CEXPR loc_expr) -> (
